@@ -1,6 +1,6 @@
 "use client"
-import React, { useCallback } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import React, { useCallback, useState } from "react"
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { TransactionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
@@ -12,8 +12,12 @@ import CategoryPicker from "./CategoryPicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Calendar1Icon, CalendarIcon } from "lucide-react";
+import { Calendar1Icon, CalendarIcon, Loader2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
+import { CreateTransaction } from "../_actions/transactions";
+import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DateToUTCDate } from "@/lib/helpers";
 interface Props {
     trigger: React.ReactNode;
     type: TransactionType
@@ -28,6 +32,7 @@ function CreateTransactionDialog({ trigger, type }: Props) {
         },
     });
 
+    const [open, setOpen] = useState(false)
     const handleCategoryChange = useCallback(
         (value: string) => {
         form.setValue("category", value)
@@ -35,8 +40,42 @@ function CreateTransactionDialog({ trigger, type }: Props) {
     [form]
     );
 
+    const queryClient = useQueryClient();
     
-    return <Dialog>
+    const { mutate, isPending } = useMutation({
+        mutationFn: CreateTransaction,
+        onSuccess: () => {
+            toast.success("Transaction created successfully 🎉",{
+                id: "create-transaction",
+            });
+            form.reset({
+                type,
+                description: "",
+                amount: 0,
+                date: new Date(),
+                category: undefined,
+            });
+            // after create a transaction , we need to invalidate the overview query which is used in the dashboard
+            queryClient.invalidateQueries({
+                queryKey: ["overview"],
+            });
+            setOpen((prev) => !prev);
+        },
+    })
+
+    const onSubmit = useCallback((values: CreateTransactionSchemaType) => {
+        toast.loading("Creating transaction...", {
+            id: "create-transaction",
+        });
+        mutate({
+            ...values,
+            date: DateToUTCDate(values.date),
+        });
+    },
+    [mutate]
+    );
+    
+    return <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
             {trigger}
         </DialogTrigger>
@@ -55,7 +94,7 @@ function CreateTransactionDialog({ trigger, type }: Props) {
                 </DialogTitle>
             </DialogHeader>
             <Form {...form}>
-                <form className="space -y-4">
+                <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
                     <FormField 
                         control={form.control}
                         name="description"
@@ -162,6 +201,20 @@ function CreateTransactionDialog({ trigger, type }: Props) {
                     </div>
                 </form>
             </Form>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button
+                            type="button"
+                            variant={"secondary"}
+                            onClick={() => {
+                                form.reset();
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                    </DialogClose>
+                    <Button onClick={form.handleSubmit(onSubmit)} disabled={isPending}>{!isPending && "Create"} {isPending && <Loader2 className="animate-spin" />}</Button>
+                </DialogFooter>
         </DialogContent>
     </Dialog>
 }
