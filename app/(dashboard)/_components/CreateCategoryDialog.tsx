@@ -18,12 +18,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CreateCategory } from '../_actions/categories'
 import { Category } from '@prisma/client'
 import { toast } from 'sonner'
+import { useTheme } from 'next-themes'
 
 interface Props {
     type: TransactionType
+    successCallback: (category: Category) => void;
 }
 
-function CreateCategoryDialog ({ type }: Props) {
+function CreateCategoryDialog ({ type, successCallback }: Props) {
     const [open, setOpen] = useState(false);
     const form = useForm<CreateCategorySchemaType>({
         resolver: zodResolver(CreateCategorySchema),
@@ -33,6 +35,7 @@ function CreateCategoryDialog ({ type }: Props) {
     });
 
     const queryClient = useQueryClient();
+    const theme = useTheme();
 
     const { mutate, isPending } = useMutation({
         mutationFn: CreateCategory,
@@ -45,6 +48,8 @@ function CreateCategoryDialog ({ type }: Props) {
             toast.success(`Created category ${data.name} created successfully 🎉`, {
                 id: "create-category",
             });
+
+            successCallback(data);
 
             await queryClient.invalidateQueries({
                 queryKey: ["categories"],
@@ -105,11 +110,11 @@ function CreateCategoryDialog ({ type }: Props) {
                                         {/* TODO: A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components*/}
                                         <FormControl>
                                             <Input
-                                                defaultValue={""} {...field}
+                                                placeholder="Category" {...field}
                                             />
                                         </FormControl>
                                         <FormDescription>
-                                            Transaction description (optional)
+                                            This is how you'll see your category in the app (optional)
                                         </FormDescription>
                                 </FormItem>
                             )}
@@ -144,16 +149,14 @@ function CreateCategoryDialog ({ type }: Props) {
                                                                 <p className="text-xs text-muted-foreground">
                                                                     Click to select
                                                                 </p>
-                                                            </div>
-                                                            
+                                                            </div>  
                                                         )}
                                                     </Button>
                                                 </PopoverTrigger>
-                                                <PopoverContent
-                                                    className="w-full"
-                                                >
+                                                <PopoverContent className="w-full">
                                                     <Picker
                                                         data={data}
+                                                        theme={theme.resolvedTheme}
                                                         onEmojiSelect={(emoji: {native: string}) => {
                                                             field.onChange(emoji.native);
                                                         }}
